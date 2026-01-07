@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="restaurantApp">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>David Chu's China Bistro - Module 5 Assignment</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular-route.js"></script>
+  <style>
+    body { padding-top: 70px; }
+    .navbar { margin-bottom: 30px; }
+    .error { color: red; font-size: 12px; }
+    .alert { margin-top: 15px; }
+    .menu-item img { max-width: 300px; margin: 20px 0; }
+    .form-group { margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <a class="navbar-brand" href="#!/">David Chu's China Bistro</a>
+      </div>
+      <ul class="nav navbar-nav navbar-right">
+        <li><a href="#!/">Home</a></li>
+        <li><a href="#!/myinfo">My Info</a></li>
+        <li><a href="#!/signup">Sign Up</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div ng-view></div>
+  </div>
+
+  <script>
+    // Main App Module
+    var app = angular.module('restaurantApp', ['ngRoute']);
+
+    // Configuration
+    app.constant('ApiBasePath', 'https://coursera-jhu-default-rtdb.firebaseio.com');
+
+    // Routing
+    app.config(function($routeProvider) {
+      $routeProvider
+        .when('/', {
+          template: '<div class="jumbotron"><h1>Welcome to David Chu\'s China Bistro</h1><p>Sign up for our newsletter to get updates about your favorite dishes!</p><a href="#!/signup" class="btn btn-primary btn-lg">Sign Up Now</a></div>'
+        })
+        .when('/signup', {
+          template: `
+            <h2>Sign Up for Newsletter</h2>
+            <form name="signupForm" ng-submit="ctrl.submit()" novalidate>
+              <div class="form-group">
+                <label>First Name *</label>
+                <input type="text" name="firstname" ng-model="ctrl.user.firstName" required class="form-control">
+                <span ng-if="signupForm.firstname.$error.required && signupForm.firstname.$touched" class="error">First name is required</span>
+              </div>
+              
+              <div class="form-group">
+                <label>Last Name *</label>
+                <input type="text" name="lastname" ng-model="ctrl.user.lastName" required class="form-control">
+                <span ng-if="signupForm.lastname.$error.required && signupForm.lastname.$touched" class="error">Last name is required</span>
+              </div>
+              
+              <div class="form-group">
+                <label>Email *</label>
+                <input type="email" name="email" ng-model="ctrl.user.email" required class="form-control">
+                <span ng-if="signupForm.email.$error.required && signupForm.email.$touched" class="error">Email is required</span>
+                <span ng-if="signupForm.email.$error.email" class="error">Invalid email format</span>
+              </div>
+              
+              <div class="form-group">
+                <label>Phone *</label>
+                <input type="tel" name="phone" ng-model="ctrl.user.phone" required class="form-control" pattern="[0-9-]+">
+                <span ng-if="signupForm.phone.$error.required && signupForm.phone.$touched" class="error">Phone is required</span>
+                <span ng-if="signupForm.phone.$error.pattern" class="error">Invalid phone format</span>
+              </div>
+              
+              <div class="form-group">
+                <label>Favorite Menu Item (e.g., L1, A1) *</label>
+                <input type="text" name="favItem" ng-model="ctrl.user.favMenuItem" required class="form-control" ng-blur="ctrl.validateMenuItem()">
+                <span ng-if="signupForm.favItem.$error.required && signupForm.favItem.$touched" class="error">Favorite menu item is required</span>
+                <span ng-if="ctrl.invalidMenuItem" class="error">No such menu number exists</span>
+              </div>
+              
+              <button type="submit" ng-disabled="signupForm.$invalid" class="btn btn-primary">Submit</button>
+              
+              <div ng-if="ctrl.saved" class="alert alert-success">Your information has been saved! <a href="#!/myinfo">View My Info</a></div>
+            </form>
+          `,
+          controller: 'SignUpController',
+          controllerAs: 'ctrl'
+        })
+        .when('/myinfo', {
+          template: `
+            <h2>My Info</h2>
+            <div ng-if="!ctrl.user" class="alert alert-info">
+              <p>Not Signed Up Yet. <a href="#!/signup">Sign up Now!</a></p>
+            </div>
+            
+            <div ng-if="ctrl.user">
+              <div class="panel panel-default">
+                <div class="panel-heading"><h3>Your Information</h3></div>
+                <div class="panel-body">
+                  <p><strong>Name:</strong> {{ctrl.user.firstName}} {{ctrl.user.lastName}}</p>
+                  <p><strong>Email:</strong> {{ctrl.user.email}}</p>
+                  <p><strong>Phone:</strong> {{ctrl.user.phone}}</p>
+                  <p><strong>Favorite Menu Item:</strong> {{ctrl.user.favMenuItem}}</p>
+                </div>
+              </div>
+              
+              <div class="panel panel-info" ng-if="ctrl.user.favMenuItemDetails">
+                <div class="panel-heading"><h3>Your Favorite Dish</h3></div>
+                <div class="panel-body">
+                  <div class="menu-item">
+                    <h4>{{ctrl.user.favMenuItemDetails.name}}</h4>
+                    <p><strong>Description:</strong> {{ctrl.user.favMenuItemDetails.description}}</p>
+                    <p><strong>Price:</strong> ${{ctrl.user.favMenuItemDetails.price_large || ctrl.user.favMenuItemDetails.price_small}}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `,
+          controller: 'MyInfoController',
+          controllerAs: 'ctrl'
+        })
+        .otherwise({
+          redirectTo: '/'
+        });
+    });
+
+    // UserService
+    app.service('UserService', function() {
+      var service = this;
+      var user = null;
+
+      service.saveUser = function(userInfo) {
+        user = userInfo;
+      };
+
+      service.getUser = function() {
+        return user;
+      };
+    });
+
+    // MenuService
+    app.service('MenuService', function($http, ApiBasePath) {
+      var service = this;
+
+      service.getMenuItem = function(shortName) {
+        var category = shortName.charAt(0);
+        var itemNumber = parseInt(shortName.substring(1)) - 1;
+        
+        return $http.get(ApiBasePath + '/menu_items/' + category + '.json')
+          .then(function(response) {
+            if (response.data && response.data.menu_items && response.data.menu_items[itemNumber]) {
+              return response.data.menu_items[itemNumber];
+            }
+            return null;
+          });
+      };
+    });
+
+    // SignUpController
+    app.controller('SignUpController', function(MenuService, UserService, $timeout) {
+      var ctrl = this;
+      ctrl.user = {};
+      ctrl.saved = false;
+      ctrl.invalidMenuItem = false;
+
+      ctrl.validateMenuItem = function() {
+        if (ctrl.user.favMenuItem) {
+          var menuItem = ctrl.user.favMenuItem.toUpperCase();
+          MenuService.getMenuItem(menuItem)
+            .then(function(item) {
+              if (item) {
+                ctrl.invalidMenuItem = false;
+              } else {
+                ctrl.invalidMenuItem = true;
+              }
+            })
+            .catch(function() {
+              ctrl.invalidMenuItem = true;
+            });
+        }
+      };
+
+      ctrl.submit = function() {
+        ctrl.saved = false;
+        ctrl.invalidMenuItem = false;
+
+        var menuItem = ctrl.user.favMenuItem.toUpperCase();
+        ctrl.user.favMenuItem = menuItem;
+
+        MenuService.getMenuItem(menuItem)
+          .then(function(item) {
+            if (item) {
+              ctrl.user.favMenuItemDetails = item;
+              UserService.saveUser(ctrl.user);
+              ctrl.saved = true;
+              
+              $timeout(function() {
+                window.location.href = '#!/myinfo';
+              }, 2000);
+            } else {
+              ctrl.invalidMenuItem = true;
+            }
+          })
+          .catch(function() {
+            ctrl.invalidMenuItem = true;
+          });
+      };
+    });
+
+    // MyInfoController
+    app.controller('MyInfoController', function(UserService) {
+      var ctrl = this;
+      ctrl.user = UserService.getUser();
+    });
+  </script>
+</body>
+</html>
